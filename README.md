@@ -50,11 +50,11 @@ TIME_URL = 'http://(You wifi IPv4 address):8000/now'
 2) Connect the M5StickC using UIFlow (USB mode), locate the `CS4360_wifi.py` file (if it does not exist, you can create a new .py file), copy the code from main.py into the CS4360_wifi.py file, and save it.  
 3) After running, the M5StickC screen should display “WiFi OK.” The ENV/GAS page can be switched by press the **M5**.
 
-At this point, the cloud terminal should print something like:
+At this time, the cloud terminal should print something like:
 ```
 INGEST: m5stickc-01 ts= 1724xxxxxxx
 ```
-At this time `data/telemetry.jsonl` will continue to add new EVN and GAS data.
+`data/telemetry.jsonl` will continue to add new EVN and GAS data.
 
 ---
 
