@@ -30,7 +30,6 @@ def now_ts():
     if SERVER_EPOCH_S > 0:
         elapsed_ms = time.ticks_diff(time.ticks_ms(), SERVER_SYNC_MS)
         return int(SERVER_EPOCH_S + max(0, elapsed_ms // 1000))
-    # Fallback: may return 1970 if never synced
     try:
         return int(time.time())
     except:
@@ -43,8 +42,8 @@ def need_resync():
     return (now_ts() - SERVER_EPOCH_S) >= RESYNC_SEC
 
 def sync_time():
-    """Sync time from HTTP /now (more stable). 
-       Update SERVER_EPOCH_S and SERVER_SYNC_MS on success."""
+    """Sync time from HTTP /now. 
+       Update SERVER_EPOCH_S and SERVER_SYNC_MS."""
     global SERVER_EPOCH_S, SERVER_SYNC_MS
     try:
         import urequests
