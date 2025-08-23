@@ -26,8 +26,8 @@ DIASeniorPro/
 ## 1. Start Cloud Reception
 Create a new virtual environment：
 ```bash
-cd dia-lift-poc
-virtualenv .venv
+cd DIASeniorPro
+python -m venv .venv OR virtualenv .venv
 # Windows: .venv\Scripts\activate
 # macOS/Linux: source virtualenv .venv.venv/bin/activate
 
