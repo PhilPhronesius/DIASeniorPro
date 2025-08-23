@@ -33,7 +33,7 @@ virtualenv .venv
 
 Download required： pip install -r cloud/requirements.txt
 
-Run： uvicorn cloud.api:app --reload --port 8000
+Run： uvicorn cloud.api:app --host 0.0.0.0 --port 8000
 ```
 If you see like `Uvicorn running on http://127.0.0.1:8000`, it means that the cloud service has started successfully.
 
