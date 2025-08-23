@@ -27,7 +27,7 @@ DIASeniorPro/
 Create a new virtual environment：
 ```bash
 cd dia-lift-poc
-python -m venv .venv
+virtualenv .venv
 # Windows: .venv\Scripts\activate
 # macOS/Linux: source virtualenv .venv.venv/bin/activate
 
