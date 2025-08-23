@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import json, pathlib, os
 
+# ----------------------------
 # Streamlit page configuration
+# ----------------------------
 st.set_page_config(page_title="DIA Lift Station Monitors (ENV/GAS)", layout="wide")
 st.title("DIA Lift Station Monitors — ENV/GAS Demo")
 
@@ -18,10 +20,10 @@ def load_df():
     Load telemetry data into a DataFrame.
     Steps:
       1) Read JSONL lines and normalize nested 'metrics' dict.
-      2) Convert 'ts' (Unix seconds) as UTC, then to DISPLAY_TZ (tz-aware -> tz-naive).
+      2) Parse 'ts' (Unix seconds) as UTC, convert to DISPLAY, store as 'Time'.
       3) Coerce metric columns to numeric.
       4) Convert Celsius to Fahrenheit and drop the Celsius column.
-      5) Sort by local time.
+      5) Sort by 'Time'.
     """
     if not DATA_FILE.exists() or os.path.getsize(DATA_FILE) == 0:
         return pd.DataFrame([])
@@ -41,20 +43,22 @@ def load_df():
     # Flatten JSON into tabular columns (e.g., metrics.xxx -> separate columns)
     df = pd.json_normalize(rows)
 
-    # Time handling: parse Unix seconds as UTC, convert to DISPLAY_TZ, then drop tz info
+    # --- Time handling: parse Unix seconds as UTC, convert to DISPLAY_TZ, then drop tz info ---
     if "ts" in df.columns:
         # parse as UTC tz-aware
         df["ts"] = pd.to_datetime(df["ts"], unit="s", utc=True, errors="coerce")
         # convert to chosen timezone and make tz-naive for plotting/table
-        df["ts_local"] = df["ts"].dt.tz_convert(DISPLAY_TZ).dt.tz_localize(None)
+        df["Time"] = df["ts"].dt.tz_convert(DISPLAY_TZ).dt.tz_localize(None)
+        # drop raw unix column to avoid duplicate time columns
+        df = df.drop(columns=["ts"])
 
     # Ensure numeric metrics
     metric_cols = [
-        "metrics.ambient_temp_c",
         "metrics.ambient_rh_pct",
         "metrics.pressure_hpa",
         "metrics.eco2_ppm",
         "metrics.tvoc_ppb",
+        "metrics.ambient_temp_c",  # keep at end so F conversion can see it if present
     ]
     for c in metric_cols:
         if c in df.columns:
@@ -66,8 +70,8 @@ def load_df():
         df = df.drop(columns=["metrics.ambient_temp_c"])
 
     # Keep only rows with valid local time and sort chronologically
-    if "ts_local" in df.columns:
-        df = df.dropna(subset=["ts_local"]).sort_values("ts_local")
+    if "Time" in df.columns:
+        df = df.dropna(subset=["Time"]).sort_values("Time")
 
     return df
 
@@ -86,21 +90,25 @@ st.caption(
 if df.empty:
     st.info("No data yet. Please run cloud/api.py (or mqtt bridge) and let the M5StickC send telemetry.")
 else:
+    # ---------------------------------------
     # Rename columns to human-friendly labels
+    # ---------------------------------------
     rename_map = {
         "metrics.ambient_temp_f": "Temperature (°F)",
         "metrics.ambient_rh_pct": "Humidity (%)",
         "metrics.pressure_hpa":   "Air Pressure (hPa)",
         "metrics.eco2_ppm":       "eCO2 (ppm)",
         "metrics.tvoc_ppb":       "TVOC (ppb)",
-        "ts_local":               "Time",
         "device_id":              "Device ID",
         "site_id":                "Site ID",
+        # 'Time' already set; no rename needed
     }
     df = df.rename(columns=rename_map)
 
+    # -----------------------------
     # Reorder the columns as desired
-    order = [
+    # -----------------------------
+    desired_order = [
         "Device ID",
         "Site ID",
         "Time",
@@ -110,15 +118,19 @@ else:
         "eCO2 (ppm)",
         "TVOC (ppb)",
     ]
-    existing = [c for c in order if c in df.columns]
+    existing = [c for c in desired_order if c in df.columns]
     others = [c for c in df.columns if c not in existing]
     df = df[existing + others]
 
+    # ------------------------------------
     # Show the latest 10 rows (pretty view)
+    # ------------------------------------
     st.subheader("Latest Data (10 rows)")
     st.dataframe(df.tail(10))
 
+    # ------------------------
     # Plot line charts by metric
+    # ------------------------
     plot_cols = [
         "Temperature (°F)",
         "Humidity (%)",
