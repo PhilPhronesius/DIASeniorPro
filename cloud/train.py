@@ -7,12 +7,14 @@ import json, pathlib, time
 from typing import List
 import pandas as pd
 
+# Define paths for data and model storage
 DATA_DIR = pathlib.Path(__file__).resolve().parent.parent / "data"
 DATA_FILE = DATA_DIR / "telemetry.jsonl"
 MODEL_FILE = DATA_DIR / "model.joblib"
 FEAT_FILE = DATA_DIR / "feature_cols.json"
 STATS_FILE = DATA_DIR / "training_stats.json"
 
+# Candidate feature columns to be used for training
 FEATURES = [
     "metrics.ambient_temp_c",
     "metrics.ambient_rh_pct",
@@ -22,6 +24,11 @@ FEATURES = [
 ]
 
 def _flatten(d, parent_key="", sep="."):
+    """
+    Recursively dictionary.
+    For example: {"metrics": {"eco2_ppm": 600}}
+    becomes: {"metrics.eco2_ppm": 600}
+    """
     items = []
     for k, v in d.items():
         nk = f"{parent_key}{sep}{k}" if parent_key else k
@@ -34,7 +41,7 @@ def _flatten(d, parent_key="", sep="."):
 def _load_df() -> pd.DataFrame:
     if not DATA_FILE.exists():
         return pd.DataFrame()
-    rows=[]
+    rows = []
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         for line in f:
             try:
@@ -45,21 +52,27 @@ def _load_df() -> pd.DataFrame:
         return pd.DataFrame()
     flats = [_flatten(r) for r in rows]
     df = pd.DataFrame(flats)
-    # timestamp
+    # Sort by timestamp if present
     if "ts" in df.columns:
         df = df.sort_values("ts")
-    # ensure numeric
+    # Ensure selected features are numeric
     for c in FEATURES:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
     return df
 
 def _clean(df: pd.DataFrame, cols: List[str]) -> pd.DataFrame:
+    # Clean the dataset: Clip extreme values to the 0.1% and 99.9% quantiles
     x = df[cols].copy()
     x = x.clip(lower=x.quantile(0.001), upper=x.quantile(0.999), axis=1)
     return x.dropna()
 
 def train():
+    """
+    Train an anomaly detection model.
+    - Preferred: IsolationForest
+    - Fallback: Robust Z-score method
+    """
     df = _load_df()
     if df.empty:
         raise SystemExit("No telemetry found at data/telemetry.jsonl")
@@ -71,25 +84,27 @@ def train():
         print(f"[warn] Only {len(X)} rows after cleaning; model may be weak (>=100 recommended).")
 
     try:
+        # Preferred model: IsolationForest
         from sklearn.ensemble import IsolationForest
         from joblib import dump
         clf = IsolationForest(
             n_estimators=200,
-            contamination=0.02,   # ~2% anomalies assumed in training
+            contamination=0.02,   # Assume ~2% anomalies in training data
             random_state=42,
             n_jobs=-1,
         )
         clf.fit(X)
-        dump({"model":"IsolationForest","clf":clf,"cols":cols}, MODEL_FILE)
+        dump({"model": "IsolationForest", "clf": clf, "cols": cols}, MODEL_FILE)
         algo = "IsolationForest"
     except Exception:
-        # Robust Z-score fallback
+        # Fallback: Robust Z-score method
         med = X.median()
         mad = (X - med).abs().median().replace(0, 1e-6)
         params = {"median": med.to_dict(), "mad": mad.to_dict(), "k": 6.0, "cols": cols}
-        MODEL_FILE.write_text(json.dumps({"model":"RobustZ","params":params}), encoding="utf-8")
+        MODEL_FILE.write_text(json.dumps({"model": "RobustZ", "params": params}), encoding="utf-8")
         algo = "RobustZ"
 
+    # Save training statistics
     FEAT_FILE.write_text(json.dumps(cols, ensure_ascii=False, indent=2), encoding="utf-8")
     STATS_FILE.write_text(json.dumps({
         "trained_at": time.time(),
