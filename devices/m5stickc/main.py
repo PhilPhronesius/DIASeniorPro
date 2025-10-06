@@ -6,8 +6,8 @@ import time, machine, network, ujson
 import hmac, hashlib, base64, urllib.parse
 
 # ---------- Wi-Fi and server config ----------
-WIFI_SSID = 'FBIvan'
-WIFI_PASS = 'CheesetheDay304'
+WIFI_SSID = ''
+WIFI_PASS = ''
 
 USE_MQTT = False
 MQTT_HOST = ''
