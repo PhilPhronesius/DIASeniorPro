@@ -3,20 +3,28 @@ from m5ui import *
 from uiflow import *
 import unit, hat
 import time, machine, network, ujson
+import hmac, hashlib, base64, urllib.parse
 
 # ---------- Wi-Fi and server config ----------
-WIFI_SSID = ''
-WIFI_PASS = ''
+WIFI_SSID = 'FBIvan'
+WIFI_PASS = 'CheesetheDay304'
 
 USE_MQTT = False
 MQTT_HOST = ''
 MQTT_PORT = 1883
 MQTT_USER = 'user'
 MQTT_PASS = 'pass'
-MQTT_TOPIC = 'dia/lift/site-001/m5stickc/env'
+# MQTT_TOPIC = 'dia/lift/site-001/m5stickc/env'
+MQTT_TOPIC = f"devices/{azure_device_id}/messages/events/"
+
 
 HTTP_URL = 'http://(***):8000/ingest'
 TIME_URL = 'http://(***):8000/now'
+
+azure_scope_id = '0ne00EB417C'
+azure_device_id = 'M5StickC'
+azure_device_key = 'Mz368wvnKRb2jxv5hegISiJ6PKk2Fb/6HKFhMczESM4='
+azure_iothub_host = 'dia-lift-station-monitors.azure-devices.net'
 
 # ---------- Synthetic time tracking ----------
 SERVER_EPOCH_S = 0     # Last synced server epoch time (seconds)
@@ -107,6 +115,15 @@ def read_sgp30():
     tvoc = _get_attr_or_call(sgp30, 'get_tvoc','TVOC','tvoc')
     return eco2, tvoc
 
+#-----------SAS Token Generator --------
+def generate_sas_token(uri, key, expiry):
+    key_bytes = base64.b64decode(key)
+    string_to_sign = urllib.parse.quote(uri, safe='') + '\n' + str(expiry)
+    signature = hmac.new(key_bytes, string_to_sign.encode('utf-8'), hashlib.sha256).digest()
+    sig_encoded = urllib.parse.quote(base64.b64encode(signature))
+    return f"SharedAccessSignature sr={uri}&sig={sig_encoded}&se={expiry}"
+
+
 # ---------- Wi-Fi ----------
 def wifi_connect():
     """Connect to Wi-Fi."""
@@ -127,41 +144,66 @@ mqttc = None
 def mqtt_setup():
     """Setup MQTT client."""
     global mqttc
+    import ubinascii
     try:
         from umqtt.robust import MQTTClient
     except:
         from umqtt.simple import MQTTClient
-    import ubinascii
-    cid = b'm5-' + ubinascii.hexlify(machine.unique_id())
-    mqttc = MQTTClient(client_id=cid, server=MQTT_HOST, port=MQTT_PORT,
-                       user=MQTT_USER, password=MQTT_PASS, keepalive=30)
+    
+    # cid = b'm5-' + ubinascii.hexlify(machine.unique_id())
+    # mqttc = MQTTClient(client_id=cid, server=MQTT_HOST, port=MQTT_PORT,
+    #                    user=MQTT_USER, password=MQTT_PASS, keepalive=30)
+    # mqttc.connect()
+    # return True
+    uri = f"{azure_iothub_host}/devices/{azure_device_id}"
+    expiry = int(time.time()) + 3600  # Token valid for 1 hour
+    sas_token = generate_sas_token(uri, azure_device_key, expiry)
+
+    mqttc = MQTTClient(
+        client_id=azure_device_id,
+        server=azure_iothub_host,
+        port=8883,
+        user=f"{azure_iothub_host}/{azure_device_id}/?api-version=2020-09-30",
+        password=sas_token,
+        ssl=True
+    )
     mqttc.connect()
     return True
 
+
 def send_payload(payload):
     """Send telemetry via HTTP or MQTT depending on config."""
+    # data = ujson.dumps(payload)
+    # if USE_MQTT:
+    #     try:
+    #         mqttc.publish(MQTT_TOPIC, data); return True
+    #     except Exception as e:
+    #         footer.setText('MQTT err')
+    #         try: print('MQTT exception:', e)
+    #         except: pass
+    #         return False
+    # else:
+    #     try:
+    #         import urequests
+    #         r = urequests.post(HTTP_URL, data=data, headers={'Content-Type':'application/json'})
+    #         sc = getattr(r, 'status_code', None); r.close()
+    #         if sc and sc != 200:
+    #             footer.setText('HTTP {}'.format(sc)); return False
+    #         return True
+    #     except Exception as e:
+    #         footer.setText('HTTP err')
+    #         try: print('HTTP exception:', e)
+    #         except: pass
+    #         return False
     data = ujson.dumps(payload)
-    if USE_MQTT:
-        try:
-            mqttc.publish(MQTT_TOPIC, data); return True
-        except Exception as e:
-            footer.setText('MQTT err')
-            try: print('MQTT exception:', e)
-            except: pass
-            return False
-    else:
-        try:
-            import urequests
-            r = urequests.post(HTTP_URL, data=data, headers={'Content-Type':'application/json'})
-            sc = getattr(r, 'status_code', None); r.close()
-            if sc and sc != 200:
-                footer.setText('HTTP {}'.format(sc)); return False
-            return True
-        except Exception as e:
-            footer.setText('HTTP err')
-            try: print('HTTP exception:', e)
-            except: pass
-            return False
+    try:
+        mqttc.publish(MQTT_TOPIC, data)
+        footer.setText('Azure OK')
+        return True
+    except Exception as e:
+        footer.setText('Azure ERR')
+        print('Azure exception:', e)
+        return False
 
 # ---------- UI pages ----------
 MODE_ENV, MODE_GAS = 0, 1
@@ -196,6 +238,12 @@ wifi_ok = wifi_connect()
 if wifi_ok:
     # Sync time on first boot (via HTTP /now)
     sync_time()
+    try:
+        mqtt_setup()
+        footer.setText('MQTT OK')
+    except Exception as e:
+        footer.setText('MQTT FAIL')
+        print('MQTT setup error:', e)
 
 if USE_MQTT and wifi_ok:
     try: mqtt_setup(); footer.setText('MQTT OK')
