@@ -726,3 +726,7 @@
 {"site_id": "site-001", "metrics": {"ambient_temp_c": 28.69039, "eco2_ppm": 400, "tvoc_ppb": 9, "pressure_hpa": 833.1562, "ambient_rh_pct": 43.64233}, "ts": 1756226707, "device_id": "m5stickc-01"}
 {"site_id": "site-001", "metrics": {"ambient_temp_c": 28.60761, "eco2_ppm": 400, "tvoc_ppb": 8, "pressure_hpa": 833.1699, "ambient_rh_pct": 43.79644}, "ts": 1756226713, "device_id": "m5stickc-01"}
 {"site_id": "site-001", "metrics": {"ambient_temp_c": 28.62097, "eco2_ppm": 400, "tvoc_ppb": 1, "pressure_hpa": 833.1618, "ambient_rh_pct": 43.70947}, "ts": 1756226720, "device_id": "m5stickc-01"}
+{"site_id": "site-001", "metrics": {"ambient_temp_c": 31.63844, "eco2_ppm": 400, "tvoc_ppb": 0, "pressure_hpa": 829.7938, "ambient_rh_pct": 36.13794}, "ts": 1758151687, "device_id": "m5stickc-01"}
+{"site_id": "site-001", "metrics": {"ambient_temp_c": 31.71053, "eco2_ppm": 402, "tvoc_ppb": 0, "pressure_hpa": 829.7756, "ambient_rh_pct": 36.04486}, "ts": 1758151695, "device_id": "m5stickc-01"}
+{"site_id": "site-001", "metrics": {"ambient_temp_c": 31.73724, "eco2_ppm": 412, "tvoc_ppb": 0, "pressure_hpa": 829.7825, "ambient_rh_pct": 36.11048}, "ts": 1758151702, "device_id": "m5stickc-01"}
+{"site_id": "site-001", "metrics": {"ambient_temp_c": 31.7506, "eco2_ppm": 407, "tvoc_ppb": 0, "pressure_hpa": 829.7619, "ambient_rh_pct": 35.95484}, "ts": 1758151709, "device_id": "m5stickc-01"}
