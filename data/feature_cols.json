@@ -1,0 +1,7 @@
+[
+  "metrics.ambient_temp_c",
+  "metrics.ambient_rh_pct",
+  "metrics.pressure_hpa",
+  "metrics.eco2_ppm",
+  "metrics.tvoc_ppb"
+]

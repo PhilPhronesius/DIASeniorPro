@@ -1,0 +1,12 @@
+{
+  "trained_at": 1756224417.0269485,
+  "algo": "IsolationForest",
+  "rows_used": 566,
+  "feature_cols": [
+    "metrics.ambient_temp_c",
+    "metrics.ambient_rh_pct",
+    "metrics.pressure_hpa",
+    "metrics.eco2_ppm",
+    "metrics.tvoc_ppb"
+  ]
+}
