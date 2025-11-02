@@ -12,22 +12,29 @@ ALERTS_FILE = pathlib.Path(__file__).resolve().parent.parent / "data" / "alerts.
 DISPLAY_TZ = "America/Denver"
 
 # -------------------------------
-@st.cache_data(ttl=5)
-def load_df():
-    if not DATA_FILE.exists() or os.path.getsize(DATA_FILE) == 0:
+def load_jsonl(file_path):
+    if not file_path.exists() or file_path.stat().st_size == 0:
         return pd.DataFrame([])
-
+    
     rows = []
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding = "utf-8") as f:
         for line in f:
             try:
                 rows.append(json.loads(line))
             except Exception:
                 pass
+
     if not rows:
         return pd.DataFrame([])
 
     df = pd.json_normalize(rows)
+    return df
+
+@st.cache_data(ttl=5)
+def load_df():
+    
+    df = load_jsonl(DATA_FILE)
+    
 
     if "ts" in df.columns:
         df["ts"] = pd.to_datetime(df["ts"], unit="s", utc=True, errors="coerce")
@@ -57,20 +64,8 @@ def load_df():
 # -------------------------------
 @st.cache_data(ttl=5)
 def load_alerts_clean():
-    if not ALERTS_FILE.exists() or os.path.getsize(ALERTS_FILE) == 0:
-        return pd.DataFrame([])
 
-    rows = []
-    with open(ALERTS_FILE, "r", encoding="utf-8") as f:
-        for line in f:
-            try:
-                rows.append(json.loads(line))
-            except Exception:
-                pass
-    if not rows:
-        return pd.DataFrame([])
-
-    df = pd.json_normalize(rows)
+    df = load_jsonl(ALERTS_FILE)
 
     if "ts" in df.columns:
         df["ts"] = pd.to_datetime(df["ts"], unit="s", utc=True, errors="coerce")
@@ -104,20 +99,7 @@ def load_alerts_clean():
             df["sample.metrics.ambient_temp_c"], errors="coerce"
         ) * 9.0 / 5.0 + 32.0
 
-    def sev_row(r):
-        if isinstance(r.get("Rule Alerts"), str) and r["Rule Alerts"]:
-            return "CRITICAL"
-        p = r.get("Anomaly Prob")
-        if pd.notna(p):
-            if p >= 0.85:
-                return "HIGH"
-            if p >= 0.60:
-                return "MEDIUM"
-        if r.get("is_anomaly") in (True, "True", "true"):
-            return "MEDIUM"
-        return None
-
-    df["Severity"] = df.apply(sev_row, axis=1)
+    df["Severity"] = df.apply(lambda r: severity_from_row(r), axis=1)
     df = df[df["Severity"].notna()]
 
     order = [
@@ -131,6 +113,23 @@ def load_alerts_clean():
     df = df.sort_values("Time", ascending=False).head(500)
     return df
 
+def severity_from_row(row):
+    if isinstance(row.get("Rule Alerts"), str) and row["Rule Alerts"]:
+        return "CRITICAL"
+    
+    p = row.get("Anomaly Prob")
+
+    if pd.nota(p):
+        if p >= 0.85:
+            return "HIGH"
+        if p >= 0.60:
+            return "MEDIUM"
+    
+    if row.get("is_anomaly") in (True, "True", "true"):
+        return "MEDIUM"
+    
+    return None
+
 # -------------------------------
 df = load_df()
 alerts_df = load_alerts_clean()
@@ -141,6 +140,10 @@ st.caption(
     f"Size: {os.path.getsize(DATA_FILE) if DATA_FILE.exists() else 0} bytes | "
     f"Rows: {0 if df.empty else len(df)} | "
     f"Display TZ: {DISPLAY_TZ}"
+)
+
+visualize_choice = st.selectbox("Select Visualization",
+            ["All metrics", "Temperature", "Humidity", "Air Pressure", "eCO2", "TVOC"]
 )
 
 if df.empty:
@@ -174,24 +177,46 @@ else:
     st.subheader("Latest Data (10 rows)")
     st.dataframe(df.tail(10), use_container_width=True)
 
-    st.subheader("Trends")
-    plot_cols = [
-        "Temperature (°F)",
-        "Humidity (%)",
-        "Air Pressure (hPa)",
-        "eCO2 (ppm)",
-        "TVOC (ppb)",
+    if visualize_choice == "All Metrics":
+        plot_cols = [
+            "Temperature (°F)",
+            "Humidity (%)",
+            "Air Pressure (hPa)",
+            "eCO2 (ppm)",
+            "TVOC (ppb)",
     ]
-    if "Time" in df.columns:
-        for col in [c for c in plot_cols if c in df.columns]:
-            series = df.set_index("Time")[col].dropna()
-            if not series.empty:
-                st.line_chart(series, height=180, use_container_width=True)
-            else:
-                st.caption(f"({col} has no data to plot)")
-    else:
-        st.warning("Time column not found; cannot plot series.")
+        
+        plot_cols = [col for col in plot_cols if col in df.columns]
 
+        if "Time" in df.columns:
+            df.set_index("Time", inplace = True)
+            st.subheader("All Metrics Over Time")
+            st.line_chart(df[plot_cols].dropna(), use_container_width = True)
+        else:
+            st.warning("Time column not found; cannot plot series.")
+
+    else:
+        metric_column_map = {
+            "Temperature": "Temperature (°F)",
+            "Humidity": "Humidity (%)",
+            "Air Pressure": "Air Pressure (hPa)",
+            "eCO2": "eCO2 (ppm)",
+            "TVOC": "TVOC (ppb)",
+        }
+
+        if visualize_choice in metric_column_map:
+            metric_col = metric_column_map[visualize_choice]
+
+            if metric_col in df.columns and "Time" in df.columns:
+                series = df.set_index("Time")[metric_col].dropna()
+
+                if not series.empty:
+                    st.subheader(f"{visualize_choice} Over Time")
+                    st.line_chart(series, height = 180, use_container_width = True)
+                else:
+                    st.caption(f"{visualize_choice} has no data to plot")
+            else:
+                st.warning(f"{visualize_choice} data is missing")
 
 # -------------------------------
 st.subheader("Alerts")
