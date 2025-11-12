@@ -1,60 +1,75 @@
-# DIA Lift Station Monitoring System
+# DIA Lift POC（ENV/GAS）
 
-## Target Functionality for POC
-
-### Monitoring Lift Stations
-Ensuring the optimal performance of lift stations is essential to prevent overflow incidents.  
-This involves real-time tracking of pump operations, flow rates, and system pressures to maintain smooth and efficient wastewater management.
-
-A lift station is a critical component in a wastewater management system, designed to move wastewater from lower to higher elevations.  
-This is particularly necessary when the natural slope of the terrain is not sufficient for gravity flow.  
-The lift station typically consists of a wet well, pumps, motors, and control systems.
-
-Wastewater flows into the wet well, and when it reaches a certain level, pumps are activated to lift the wastewater through a pressurized pipe system to a higher elevation, where it continues its journey to a treatment facility or another lift station.
+**M5StickC Plus + ENV-III + Mini TVOC/eCO2** 
+- Use M5StickC plus to read the environment/gas data in real time → Report **HTTP** (default) or **MQTT**;
+- Cloud FastAPI receives and saves to `data/telemetry.jsonl`;
+- Streamlit View real-time data.
 
 ---
 
-### Pumps and Motors
-Monitoring the performance of pumps and motors is crucial.  
-This includes tracking parameters like **vibration**, **temperature**, and **power consumption** to predict failures and schedule maintenance proactively.
+## 0. Preparation
+- The computer and M5StickC are on the same Wi-Fi network.
+- UIFlow Web IDE（USB mode）
+
+Directory structure：
+```
+DIASeniorPro/
+├─ device/m5stickc/main.py   # MicroPython program for M5StickC
+├─ cloud/api.py              # FastAPI receiving service (HTTP /ingest)
+├─ cloud/requirements.txt
+├─ dashboard/app.py          # Streamlit monitors the website (reads data/telemetry.jsonl)
+└─ data/                     # Data storage
+```
 
 ---
 
-### Wet Well Levels
-Keeping an eye on the wet well levels helps manage the inflow and outflow of wastewater.  
-Sensors can detect **high or low levels** and trigger alarms to prevent overflows or dry running of pumps.
+## 1. Start Cloud Reception
+Create a new virtual environment：
+```bash
+cd DIASeniorPro
+python -m venv .venv OR virtualenv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source virtualenv .venv.venv/bin/activate
+
+Download required： pip install -r cloud/requirements.txt
+
+Run： uvicorn cloud.api:app --host 0.0.0.0 --port 8000
+```
+If you see like `Uvicorn running on http://127.0.0.1:8000`, it means that the cloud service has started successfully.
 
 ---
 
-## Flow Rates
-Measuring the flow rates of incoming and outgoing wastewater can help assess the **efficiency** of the lift station and detect any **blockages** or **leaks**.
+## 2. Write and run the M5StickC program
+1) Open `devices/m5stickc/main.py` and modify:
+```python
+WIFI_SSID = 'You WiFi name'
+WIFI_PASS = 'You WiFi password'
+HTTP_URL  = 'http://(You wifi IPv4 address):8000/ingest'
+TIME_URL = 'http://(You wifi IPv4 address):8000/now'
+```
+2) Connect the M5StickC using UIFlow (USB mode), locate the `CS4360_wifi.py` file (if it does not exist, you can create a new .py file), copy the code from main.py into the CS4360_wifi.py file, and save it.  
+3) After running, the M5StickC screen should display “WiFi OK.” The ENV/GAS page can be switched by press the **M5**.
+
+At this time, the cloud terminal should print something like:
+```
+INGEST: m5stickc-01 ts= 1724xxxxxxx
+```
+`data/telemetry.jsonl` will continue to add new EVN and GAS data.
 
 ---
 
-## Environmental Conditions
-Tracking environmental conditions such as **temperature**, **humidity**, and **gas levels** (e.g., methane or hydrogen sulfide) can help maintain a safe working environment and prevent hazardous situations.
+## 3. Open the visualization webpage
+Open another terminal (still in the virtual environment):
+```bash
+Run： streamlit run dashboard/app.py
+```
+The web page will display monitors data and line graphs (temperature, humidity, air pressure, eCO2, TVOC).
 
 ---
 
-### Gas Levels
+## 4. Frequently Questions
+- **No data**: Confirm that `HTTP_URL` is using the computer's IPv4 address, not 127.0.0.1; confirm that the computer's firewall is not blocking port 8000.
+- **Wi‑Fi FAIL**: Check the SSID/password and ensure that you are connected to the 2.4GHz network; test the mobile hotspot if necessary.
+- **HTTP err**: Check if the computer and device are on the same network segment? And is `cloud/api.py` running?
 
-#### Considerations
-Monitoring gas levels in waste lift stations (sewage pumping stations) requires specialized sensors capable of detecting gases commonly found in such environments, such as:
 
-- **Hydrogen Sulfide (H₂S)**: Produced by organic matter decomposition; highly toxic.
-- **Methane (CH₄)**: Flammable and explosive.
-- **Carbon Dioxide (CO₂)**: Can displace oxygen in confined spaces.
-- **Oxygen (O₂)**: Low levels can indicate an unsafe environment.
-
-**Sensor Durability:** Waterproof (**IP65 or higher**) and corrosion-resistant.  
-**Maintenance:** Regular sensor calibration and replacement.
-
----
-
-## Solution Criteria
-
-- **Power Requirements:** Provide power for sensors and local hub/gateway.
-- **Power Limitations:** Solution should consider the limited availability of power outlets where sensors need to be deployed.
-- **Device Durability:** Solution should be ruggedized for harsh environments.
-- **Network Connectivity:** Solution should use **Wi-Fi** as its primary network.
-- **Machine Learning Integration:** The solution should incorporate ML algorithms to identify standard operations and generate alerts for any deviations from the norm.
