@@ -232,18 +232,18 @@ while True:
     # Same-second de-duplication
     sec = int(now)
     if (last_sent_second is None) or (sec != last_sent_second):
+      last_sent_second = sec
       payload = {
-        'Temperature_1': t_f,   # °F
-        'Humidity_1':    h,
-        'Pressure_1':    p,     # hPa
-        'Hydrogen_1':    h2,
-        'Ethanol_1':     eth,
-        'eCO2_1':        eco2,  # ppm
-        'TVOC_1':        tvoc,  # ppb
+        'Temperature': t_f,   # °F
+        'Humidity':    h,
+        'Pressure':    p,     # hPa
+        'Hydrogen':    h2,
+        'Ethanol':     eth,
+        'eCO2':        eco2,  # ppm
+        'TVOC':        tvoc,  # ppb
         'msg_id':        msg_counter + 1
       }
       if azure and publish(payload):
-        last_sent_second = sec
         msg_counter += 1
       else:
         print('Azure not connected or publish failed')
