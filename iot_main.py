@@ -232,8 +232,8 @@ while True:
     # Same-second de-duplication
     sec = int(now)
     if (last_sent_second is None) or (sec != last_sent_second):
-      last_sent_second = sec
-      payload = {
+      last_sent_second = sec # moved to prevent duplication
+      payload =  py_2_json({
         'Temperature': t_f,   # °F
         'Humidity':    h,
         'Pressure':    p,     # hPa
@@ -242,7 +242,7 @@ while True:
         'eCO2':        eco2,  # ppm
         'TVOC':        tvoc,  # ppb
         'msg_id':        msg_counter + 1
-      }
+      })
       if azure and publish(payload):
         msg_counter += 1
       else:
